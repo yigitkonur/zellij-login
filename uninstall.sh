@@ -34,6 +34,7 @@ rmdir "$prefix" 2>/dev/null || true
 
 if [ -f "$ZSHRC" ] && grep -Fq "$MARK_OPEN" "$ZSHRC"; then
   tmp="$(mktemp)"
+  trap 'rm -f -- "$tmp"' EXIT
   awk -v o="$MARK_OPEN" -v c="$MARK_CLOSE" '
     index($0, o) > 0 { inblock = 1; next }
     index($0, c) > 0 { inblock = 0; next }

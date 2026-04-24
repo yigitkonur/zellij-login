@@ -80,12 +80,12 @@ if [ "$wire" -eq 0 ]; then
   exit 0
 fi
 
-[ -f "$ZSHRC" ] || : > "$ZSHRC"
 if grep -Fq "$MARK_OPEN" "$ZSHRC" 2>/dev/null; then
   info "$ZSHRC already sources the hook"
 else
-  # Ensure file ends with a newline before appending.
-  if [ -s "$ZSHRC" ] && [ "$(tail -c 1 "$ZSHRC" | wc -l | tr -d ' ')" = 0 ]; then
+  # If $ZSHRC exists with content that doesn't end in a newline, add one
+  # so our marker doesn't concatenate onto the last line.
+  if [ -s "$ZSHRC" ] && [ -n "$(tail -c 1 "$ZSHRC")" ]; then
     printf '\n' >> "$ZSHRC"
   fi
   {

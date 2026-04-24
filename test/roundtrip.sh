@@ -58,9 +58,13 @@ now="$(cat "$tmp_home/.zshrc")"
 }
 say "uninstall: ok"
 
-# --- 5. hook guards (source it in a non-interactive zsh, ensure clean exit) ---
-ZMX_LOGIN_HOOK_DONE=1 zsh -c ". '$ROOT/zmx-ssh-login.zsh'" >/dev/null 2>&1 \
-  || fail "hook errors when re-source guard is set"
-say "guard: ok"
+# --- 5. non-interactive sourcing is a silent no-op ---
+# zsh -c runs a non-interactive shell, so the hook bails on the [[ -o interactive ]]
+# guard. This verifies the hook doesn't error out in that path -- it does NOT exercise
+# the ZMX_LOGIN_HOOK_DONE re-entry guard, which requires a live interactive tty to
+# test and isn't feasible in CI.
+zsh -c ". '$ROOT/zmx-ssh-login.zsh'" >/dev/null 2>&1 \
+  || fail "hook errors when sourced in a non-interactive shell"
+say "non-interactive-guard: ok"
 
 say "all tests passed"
