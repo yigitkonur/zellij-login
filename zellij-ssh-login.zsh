@@ -197,11 +197,14 @@ _zellij_login_hook() {
   # Prefer our minimal "shell with persistence" layout if the installer placed
   # it. Falls back to the user's default_layout when the file isn't there
   # (e.g., they ran the installer with --no-zellij-config).
+  # --layout is a zellij-top-level flag, not an `attach` subcommand option —
+  # it MUST come before `attach`, or zellij rejects the whole invocation.
   local -a zj_args
-  zj_args=(attach -c "$name")
+  zj_args=(zellij)
   [[ -r ${ZELLIJ_CONFIG_DIR:-$HOME/.config/zellij}/layouts/zellij-login.kdl ]] \
     && zj_args+=(--layout zellij-login)
-  zellij "${zj_args[@]}"
+  zj_args+=(attach -c "$name")
+  "${zj_args[@]}"
 }
 
 _zellij_login_hook
