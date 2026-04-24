@@ -57,15 +57,29 @@ session_name_from_line() {
   printf '%s\n' "$parsed"
 }
 
-# Pull this session's line out of `zellij list-sessions -n` (no formatting).
-status_line=$(
-  list_sessions | while IFS= read -r line; do
+match_status_line() {
+  while IFS= read -r line; do
     parsed=$(session_name_from_line "$line")
     [ "$parsed" = "$name" ] || continue
     printf '%s\n' "$line"
-    break
+    return 0
   done
-)
+}
+
+# Read the hook's list-sessions snapshot first (avoids the per-keystroke
+# zellij fork that scrolling the picker used to trigger). Fall back to a
+# timed live `zellij list-sessions -n` only if the snapshot is missing
+# (first install, sandboxed tests) or doesn't contain the name (stale by
+# one keystroke after an external session change). The shared parser
+# handles session names containing spaces.
+list_cache="$cache/.sessions.txt"
+status_line=""
+if [ -f "$list_cache" ]; then
+  status_line=$(match_status_line < "$list_cache")
+fi
+if [ -z "$status_line" ]; then
+  status_line=$(list_sessions | match_status_line)
+fi
 
 if [ -z "$status_line" ]; then
   printf 'session:  %s\n' "$name"
