@@ -310,8 +310,14 @@ _zellij_login_hook() {
 }
 
 _zellij_login_hook || true
+# Unset all nested helpers too -- zsh hoists nested function definitions to
+# global scope, so a sole `unset -f _zellij_login_hook` would leak the `_zl_*`
+# symbols into the user's interactive shell on every SSH login. The stderr
+# squash + `|| true` covers the non-interactive-guard path where the nested
+# helpers were never defined and zsh's `unset -f` errors on missing names.
 unset -f _zellij_login_hook \
   _zl_mtime _zl_session_name_from_line _zl_valid_new_session_name \
   _zl_record_attach _zl_record_cwd _zl_record_recent_dir \
   _zl_list_sessions _zl_sorted_sessions _zl_dir_candidates \
+  _zl_gc_cache \
   2>/dev/null || true
