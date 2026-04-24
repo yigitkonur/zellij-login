@@ -76,6 +76,24 @@ info() { printf 'zellij-login: %s\n' "$*"; }
 warn() { printf 'zellij-login: %s\n' "$*" >&2; }
 die()  { warn "$*"; exit 1; }
 
+# Resolve a relative --prefix to an absolute path. The source line we later
+# append to $ZSHRC embeds $prefix verbatim; a relative value like `./foo`
+# would be re-resolved against whatever PWD zsh has on next login, which is
+# almost never the one the user ran the installer from.
+case "$prefix" in
+  /*) ;;
+  *)
+    prefix_orig=$prefix
+    prefix_parent=$(dirname -- "$prefix")
+    prefix_base=$(basename -- "$prefix")
+    mkdir -p -- "$prefix_parent" 2>/dev/null || true
+    # shellcheck disable=SC1007  # intentional: drop CDPATH for this cd only
+    prefix_abs=$(CDPATH= cd -- "$prefix_parent" 2>/dev/null && pwd) \
+      || die "could not resolve --prefix=$prefix_orig to an absolute path"
+    prefix="$prefix_abs/$prefix_base"
+    ;;
+esac
+
 # On mac, bootstrap Homebrew itself if it's missing — so the one-liner works
 # end-to-end on a clean machine instead of stopping at "install brew first."
 bootstrap_brew() {
