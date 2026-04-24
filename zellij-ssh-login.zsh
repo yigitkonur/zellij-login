@@ -120,10 +120,16 @@ _zellij_login_hook() {
   local _zl_datadir="${XDG_DATA_HOME:-$HOME/.local/share}/zellij-login"
   local _zl_preview_script="$_zl_datadir/zellij-login-preview.sh"
   local _zl_action_script="$_zl_datadir/zellij-login-action.sh"
+  # fzf passes these command strings to `sh -c`, so any shell metacharacter
+  # in the path (most commonly a space in $HOME) has to be quoted for sh or
+  # `sh /Users/John Doe/…` splits into `sh /Users/John` + bad argv.
+  # ${(q)…} is zsh's built-in shell-quote; handles spaces, quotes, and $.
   local _zl_preview_cmd="" _zl_header="enter = pick · esc = skip"
+  local _zl_preview_q=${(q)_zl_preview_script}
+  local _zl_action_q=${(q)_zl_action_script}
   local -a _zl_binds
   if [[ -x $_zl_preview_script ]]; then
-    _zl_preview_cmd="sh $_zl_preview_script {}"
+    _zl_preview_cmd="sh $_zl_preview_q {}"
   fi
   if [[ -x $_zl_action_script ]]; then
     # +pos(2) after reload parks the cursor on the first real session (skip
@@ -132,8 +138,8 @@ _zellij_login_hook() {
     # next session slides up, cursor stays on position 2 ready for the
     # next kill.
     _zl_binds=(
-      "--bind=ctrl-x:execute-silent(sh $_zl_action_script kill {})+reload(sh $_zl_action_script list)+pos(2)"
-      "--bind=ctrl-k:execute-silent(sh $_zl_action_script clean-dead)+reload(sh $_zl_action_script list)+pos(2)"
+      "--bind=ctrl-x:execute-silent(sh $_zl_action_q kill {})+reload(sh $_zl_action_q list)+pos(2)"
+      "--bind=ctrl-k:execute-silent(sh $_zl_action_q clean-dead)+reload(sh $_zl_action_q list)+pos(2)"
     )
     _zl_header="enter=pick · esc=skip · ctrl-x=kill/delete · ctrl-k=clean dead"
   fi
