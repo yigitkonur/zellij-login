@@ -124,12 +124,17 @@ _zellij_login_hook() {
   # in the path (most commonly a space in $HOME) has to be quoted for sh or
   # `sh /Users/John Doe/…` splits into `sh /Users/John` + bad argv.
   # ${(q)…} is zsh's built-in shell-quote; handles spaces, quotes, and $.
-  local _zl_preview_cmd="" _zl_header="enter = pick · esc = skip"
+  local _zl_header="enter = pick · esc = skip"
   local _zl_preview_q=${(q)_zl_preview_script}
   local _zl_action_q=${(q)_zl_action_script}
-  local -a _zl_binds
+  local -a _zl_binds _zl_preview_args
   if [[ -x $_zl_preview_script ]]; then
-    _zl_preview_cmd="sh $_zl_preview_q {}"
+    # Only set --preview when we actually have a renderer — otherwise fzf
+    # reserves an empty 40%-wide pane for a preview that never appears.
+    _zl_preview_args=(
+      "--preview=sh $_zl_preview_q {}"
+      "--preview-window=right,40%,wrap"
+    )
   fi
   if [[ -x $_zl_action_script ]]; then
     # +pos(2) after reload parks the cursor on the first real session (skip
@@ -150,9 +155,8 @@ _zellij_login_hook() {
   choice=$(
     { print -- "$SKIP_SESSION"; _zl_sorted_sessions; print -- "$NEW_SESSION"; } \
     | fzf --height=60% --reverse --prompt="zellij session > " --no-multi \
-        --preview="$_zl_preview_cmd" --preview-window='right,40%,wrap' \
         --header-first --header="$_zl_header" \
-        "${_zl_binds[@]}"
+        "${_zl_preview_args[@]}" "${_zl_binds[@]}"
   )
   [[ -z $choice || $choice == "$SKIP_SESSION" ]] && return 0
 
