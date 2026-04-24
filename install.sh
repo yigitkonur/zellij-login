@@ -49,9 +49,28 @@ info() { printf 'zmx-login: %s\n' "$*"; }
 warn() { printf 'zmx-login: %s\n' "$*" >&2; }
 die()  { warn "$*"; exit 1; }
 
-command -v zsh >/dev/null 2>&1 || die "zsh is required"
-command -v zmx >/dev/null 2>&1 || warn "zmx not on PATH — install from https://github.com/neurosnap/zmx before first SSH"
-command -v fzf >/dev/null 2>&1 || warn "fzf not on PATH — install via your package manager before first SSH"
+# Platform-aware install hints for missing deps so the warning is copy-paste actionable.
+case "$(uname -s 2>/dev/null)" in
+  Darwin)
+    zsh_hint="brew install zsh"
+    zmx_hint="brew install neurosnap/tap/zmx"
+    fzf_hint="brew install fzf"
+    ;;
+  Linux)
+    zsh_hint="apt install zsh  (or your distro's package manager)"
+    zmx_hint="grab a release binary from https://github.com/neurosnap/zmx/releases"
+    fzf_hint="apt install fzf  (or your distro's package manager)"
+    ;;
+  *)
+    zsh_hint="see https://www.zsh.org/"
+    zmx_hint="see https://github.com/neurosnap/zmx"
+    fzf_hint="see https://github.com/junegunn/fzf"
+    ;;
+esac
+
+command -v zsh >/dev/null 2>&1 || die "zsh is required — install: $zsh_hint"
+command -v zmx >/dev/null 2>&1 || warn "zmx not on PATH — install: $zmx_hint"
+command -v fzf >/dev/null 2>&1 || warn "fzf not on PATH — install: $fzf_hint"
 
 # Locate source hook: prefer local copy adjacent to this script, else fetch from GitHub.
 src=""
