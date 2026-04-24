@@ -42,8 +42,9 @@ emit_sorted_list() {
       *)        icon='●' ;;
     esac
     if [ -f "$cache/attached/$name" ]; then
-      ts=$(stat -f %m "$cache/attached/$name" 2>/dev/null \
-           || stat -c %Y "$cache/attached/$name" 2>/dev/null \
+      # GNU stat first — see zellij-login-preview.sh for why the order matters.
+      ts=$(stat -c %Y "$cache/attached/$name" 2>/dev/null \
+           || stat -f %m "$cache/attached/$name" 2>/dev/null \
            || echo 0)
     else
       ts=0

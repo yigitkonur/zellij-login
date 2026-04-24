@@ -49,8 +49,10 @@ cwd=""
 
 last=""
 if [ -f "$cache/attached/$name" ]; then
-  ts=$(stat -f %m "$cache/attached/$name" 2>/dev/null \
-       || stat -c %Y "$cache/attached/$name" 2>/dev/null \
+  # GNU stat first — `-f %m` on Linux misparses as filesystem-info mode and
+  # pollutes stdout with garbage; `-c %Y` works on Linux, BSD falls through.
+  ts=$(stat -c %Y "$cache/attached/$name" 2>/dev/null \
+       || stat -f %m "$cache/attached/$name" 2>/dev/null \
        || echo 0)
   if [ "$ts" -gt 0 ]; then
     now=$(date +%s)

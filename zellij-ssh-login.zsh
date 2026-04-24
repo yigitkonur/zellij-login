@@ -19,9 +19,14 @@ _zellij_login_hook() {
   local choice name target picked key sub r ts
   local -a roots fzf_out
 
-  # Portable file-mtime (macOS BSD stat vs GNU stat).
+  # Portable file-mtime (GNU stat vs macOS BSD stat).
+  # GNU first: on Linux `stat -f %m` misparses as filesystem-info mode (with
+  # `%m` read as a FILE argument); the command exits non-zero AND emits
+  # default filesystem info for the real file on stdout, so the || fallback
+  # still runs but $(...) captures both outputs -> multi-line garbage.
+  # `stat -c %Y` succeeds cleanly on Linux; BSD rejects `-c` and falls through.
   _zl_mtime() {
-    stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || print -- 0
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || print -- 0
   }
 
   # Touch $CACHE_DIR/attached/<name> so the next picker sorts it to the top.
@@ -63,9 +68,7 @@ _zellij_login_hook() {
         icon='●'
       fi
       if [[ -f "$CACHE_DIR/attached/$name" ]]; then
-        ts=$(stat -f %m "$CACHE_DIR/attached/$name" 2>/dev/null \
-             || stat -c %Y "$CACHE_DIR/attached/$name" 2>/dev/null \
-             || print -- 0)
+        ts=$(_zl_mtime "$CACHE_DIR/attached/$name")
       else
         ts=0
       fi
