@@ -134,4 +134,43 @@ sh "$ROOT/install.sh" --no-install-deps --no-zellij-config >/dev/null
   || fail "--no-zellij-config still wrote the layout file"
 say "--no-zellij-config: ok"
 
+# --- 8. curl-pipe does not false-detect CWD as a local clone ---
+# When `curl | sh` runs, $0 is "sh" and `dirname -- "$0"` resolves to the
+# user's CWD. If that CWD happens to contain an unrelated checkout of this
+# repo, the old code path mis-detected it and installed from there instead
+# of fetching from GitHub. Simulate by piping install.sh over stdin from a
+# sandbox CWD that contains only a fake hook; a curl shim makes the download
+# path deterministic (no network required). The installer must NOT take the
+# local-clone branch.
+env_opts
+rm -rf -- "$tmp_home/.local/share/zellij-login" "$tmp_home/.config/zellij"
+cat > "$tmp_home/.zshrc" <<'EOF'
+# my dotfile
+EOF
+fake_clone="$tmp_home/fake-clone"
+mkdir -p -- "$fake_clone"
+printf '# fake hook -- must NOT be installed\n' > "$fake_clone/zellij-ssh-login.zsh"
+
+mkdir -p -- "$tmp_home/bin"
+cat > "$tmp_home/bin/curl" <<'EOF'
+#!/bin/sh
+echo "curl-shim: simulated network failure" >&2
+exit 7
+EOF
+chmod +x "$tmp_home/bin/curl"
+
+log="$tmp_home/curl-pipe.log"
+(
+  cd "$fake_clone" || exit 1
+  PATH="$tmp_home/bin:$PATH" sh -s -- --no-install-deps < "$ROOT/install.sh"
+) > "$log" 2>&1 || true
+
+[ ! -f "$tmp_home/.local/share/zellij-login/zellij-ssh-login.zsh" ] \
+  || fail "curl-pipe: fake-clone hook installed -- detection misfired"
+! grep -Fq "installing from local clone" "$log" \
+  || { cat "$log" >&2; fail "curl-pipe: installer logged 'installing from local clone'"; }
+grep -Fq "downloading" "$log" \
+  || { cat "$log" >&2; fail "curl-pipe: download branch not reached"; }
+say "curl-pipe-detection: ok"
+
 say "all tests passed"
