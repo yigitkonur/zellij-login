@@ -232,8 +232,21 @@ src=""
 src_preview=""
 src_action=""
 src_layout=""
-# shellcheck disable=SC1007  # intentional: unset CDPATH for this cd only
-script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)" || script_dir=""
+# Only probe for a local clone when $0 looks like a real install.sh file path.
+# Under `curl | sh` the shell sees $0="sh" and `dirname -- "$0"` resolves to
+# the user's CWD -- if that happens to contain an unrelated checkout of this
+# repo, the old detection misfires and installs from there instead of fetching
+# from GitHub. Gating on the basename is the cheapest reliable discriminator:
+# legitimate invocations (sh install.sh, ./install.sh, /abs/install.sh) keep
+# the local-clone path; curl-pipe and `cat install.sh | sh` fall through to
+# the download branch as intended.
+script_dir=""
+case "$0" in
+  */install.sh|install.sh)
+    # shellcheck disable=SC1007  # intentional: unset CDPATH for this cd only
+    script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)" || script_dir=""
+    ;;
+esac
 if [ -n "$script_dir" ] && [ -f "$script_dir/$HOOK_NAME" ]; then
   src="$script_dir/$HOOK_NAME"
   [ -f "$script_dir/$PREVIEW_NAME" ] && src_preview="$script_dir/$PREVIEW_NAME"
