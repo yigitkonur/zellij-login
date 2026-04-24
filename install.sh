@@ -11,6 +11,7 @@ BRANCH="main"
 RAW_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 
 HOOK_NAME="zellij-ssh-login.zsh"
+PREVIEW_NAME="zellij-login-preview.sh"
 DEFAULT_PREFIX="${XDG_DATA_HOME:-$HOME/.local/share}/zellij-login"
 MARK_OPEN="# zellij-login:hook {{{"
 MARK_CLOSE="# zellij-login:hook }}}"
@@ -206,14 +207,16 @@ migrate_legacy() {
 }
 migrate_legacy
 
-# Resolve hook and layout sources: prefer a local clone adjacent to this script;
-# otherwise fetch from GitHub raw into a single temp dir.
+# Resolve hook, preview, and layout sources: prefer a local clone adjacent to
+# this script; otherwise fetch each from GitHub raw into a single temp dir.
 src=""
+src_preview=""
 src_layout=""
 # shellcheck disable=SC1007  # intentional: unset CDPATH for this cd only
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)" || script_dir=""
 if [ -n "$script_dir" ] && [ -f "$script_dir/$HOOK_NAME" ]; then
   src="$script_dir/$HOOK_NAME"
+  [ -f "$script_dir/$PREVIEW_NAME" ] && src_preview="$script_dir/$PREVIEW_NAME"
   [ -f "$script_dir/$LAYOUT_REL_PATH" ] && src_layout="$script_dir/$LAYOUT_REL_PATH"
   info "installing from local clone ($script_dir)"
 else
@@ -224,6 +227,12 @@ else
   curl -fsSL "$RAW_URL/$HOOK_NAME" -o "$_tmpdir/$HOOK_NAME" \
     || die "download failed: $RAW_URL/$HOOK_NAME"
   src="$_tmpdir/$HOOK_NAME"
+  info "downloading $PREVIEW_NAME from $RAW_URL"
+  if curl -fsSL "$RAW_URL/$PREVIEW_NAME" -o "$_tmpdir/$PREVIEW_NAME"; then
+    src_preview="$_tmpdir/$PREVIEW_NAME"
+  else
+    warn "preview download failed — session picker will lack the preview pane"
+  fi
   if [ "$install_config" -eq 1 ]; then
     info "downloading $LAYOUT_NAME from $RAW_URL"
     if curl -fsSL "$RAW_URL/$LAYOUT_REL_PATH" -o "$_tmpdir/$LAYOUT_NAME"; then
@@ -241,6 +250,14 @@ action="installed"
 [ -f "$prefix/$HOOK_NAME" ] && action="upgraded"
 cp -- "$src" "$prefix/$HOOK_NAME"
 info "$action hook at $prefix/$HOOK_NAME"
+
+# Ship the preview helper alongside the hook. Hook references it by the default
+# install prefix; a --prefix override leaves preview working only for the
+# standard path (acceptable — preview is cosmetic).
+if [ -n "$src_preview" ]; then
+  cp -- "$src_preview" "$prefix/$PREVIEW_NAME"
+  chmod +x "$prefix/$PREVIEW_NAME"
+fi
 
 # Install the zellij-login layout (single pane + compact-bar, no tab bar)
 # unless the user opted out via --no-zellij-config. This is what makes new

@@ -46,23 +46,31 @@ _zellij_login_hook() {
       | awk 'NF' | head -50 > "$tmp" && mv -- "$tmp" "$file"
   }
 
-  # Live sessions from zellij, sorted descending by $CACHE_DIR/attached mtime
-  # (sessions never attached-via-this-hook fall to mtime=0, keeping zellij's
-  # own order for the tail). Stale cache entries for killed sessions are
-  # ignored naturally — we only emit names zellij reports as live.
+  # Live sessions, sorted desc by $CACHE_DIR/attached mtime, prefixed with a
+  # status icon: ● for active sessions, ✗ for exited-but-resurrectable. We
+  # parse `zellij list-sessions -n` (no-formatting form) because it contains
+  # the EXITED marker; --short does not. The icon prefix is stripped by the
+  # caller before the name goes back to zellij.
   _zl_sorted_sessions() {
-    local live name ts
-    live=$(zellij list-sessions --short 2>/dev/null)
-    [[ -z $live ]] && return
-    while IFS= read -r name; do
+    local line name ts icon
+    zellij list-sessions -n 2>/dev/null | while IFS= read -r line; do
+      [[ -z $line ]] && continue
+      name=${line%% *}
       [[ -z $name ]] && continue
+      if [[ $line == *EXITED* ]]; then
+        icon='✗'
+      else
+        icon='●'
+      fi
       if [[ -f "$CACHE_DIR/attached/$name" ]]; then
-        ts=$(_zl_mtime "$CACHE_DIR/attached/$name")
+        ts=$(stat -f %m "$CACHE_DIR/attached/$name" 2>/dev/null \
+             || stat -c %Y "$CACHE_DIR/attached/$name" 2>/dev/null \
+             || print -- 0)
       else
         ts=0
       fi
-      printf '%s\t%s\n' "$ts" "$name"
-    done <<< "$live" | sort -rn -k1,1 | cut -f2-
+      printf '%s\t%s %s\n' "$ts" "$icon" "$name"
+    done | sort -rn -k1,1 | cut -f2-
   }
 
   # Dir candidates for the new-session picker: MRU entries first (existing
@@ -85,12 +93,27 @@ _zellij_login_hook() {
 
   # Skip is the first (default-highlighted) item so that Enter on an empty
   # query lands you in a normal shell with no zellij involvement.
+  # Preview pane (right side) renders session metadata — cwd, status,
+  # created-ago, last-attached — via the installer-shipped helper script.
+  # If the helper isn't present (e.g. user installed with --prefix= somewhere
+  # exotic), --preview silently no-ops and the picker just loses the pane.
+  local _zl_preview_cmd=""
+  local _zl_preview_script="${XDG_DATA_HOME:-$HOME/.local/share}/zellij-login/zellij-login-preview.sh"
+  [[ -x $_zl_preview_script ]] && _zl_preview_cmd="sh $_zl_preview_script {}"
   choice=$(
     { print -- "$SKIP_SESSION"; print -- "$NEW_SESSION"; _zl_sorted_sessions; } \
-    | fzf --height=40% --reverse --prompt="zellij session > " --no-multi \
+    | fzf --height=50% --reverse --prompt="zellij session > " --no-multi \
+        --preview="$_zl_preview_cmd" --preview-window='right,40%,wrap' \
         --header-first --header="enter = pick highlighted · esc = skip"
   )
   [[ -z $choice || $choice == "$SKIP_SESSION" ]] && return 0
+
+  # Strip the status icon prefix ("● " / "✗ ") we added in _zl_sorted_sessions.
+  # Sentinels don't have one, so this is a literal-prefix conditional strip.
+  case $choice in
+    "● "*) choice=${choice#"● "} ;;
+    "✗ "*) choice=${choice#"✗ "} ;;
+  esac
 
   # Warp wraps the shell in a per-tab ZDOTDIR (warptmp.XXXXXX) whose .zshrc
   # chain-sources the real ~/.zshrc. Inside a multiplexer PTY that chain can

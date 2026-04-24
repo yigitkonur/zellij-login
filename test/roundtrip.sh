@@ -35,6 +35,10 @@ grep -Fq '# zellij-login:hook {{{' "$tmp_home/.zshrc" \
   || fail "marker not added to .zshrc"
 [ -f "$tmp_home/.local/share/zellij-login/zellij-ssh-login.zsh" ] \
   || fail "hook file not placed"
+[ -f "$tmp_home/.local/share/zellij-login/zellij-login-preview.sh" ] \
+  || fail "preview helper not placed"
+[ -x "$tmp_home/.local/share/zellij-login/zellij-login-preview.sh" ] \
+  || fail "preview helper not executable"
 [ -f "$tmp_home/.config/zellij/layouts/zellij-login.kdl" ] \
   || fail "layout file not placed"
 grep -Fq 'zellij:compact-bar' "$tmp_home/.config/zellij/layouts/zellij-login.kdl" \
@@ -62,6 +66,8 @@ mkdir -p -- "$tmp_home/.cache/zellij-login/attached"
 sh "$ROOT/uninstall.sh" >/dev/null
 [ ! -f "$tmp_home/.local/share/zellij-login/zellij-ssh-login.zsh" ] \
   || fail "hook file not removed"
+[ ! -f "$tmp_home/.local/share/zellij-login/zellij-login-preview.sh" ] \
+  || fail "preview helper not removed"
 [ ! -f "$tmp_home/.config/zellij/layouts/zellij-login.kdl" ] \
   || fail "layout file not removed"
 [ ! -d "$tmp_home/.cache/zellij-login" ] \
