@@ -26,10 +26,13 @@ cache="${XDG_CACHE_HOME:-$HOME/.cache}/zellij-login"
 # emit_sorted_list: same shape as the hook's _zl_sorted_sessions. Duplicated
 # here (~15 lines) rather than fetched from the hook — this helper is reached
 # through fzf --bind subshells that don't inherit the hook's locals.
+#
+# Order MUST match the hook's initial-list pipeline: skip first (safe default
+# for Enter-after-reload), real sessions in the middle (sorted desc by last-
+# attached mtime), new-session LAST (so accidental Enter after a kill can't
+# trigger the create-new-session flow).
 emit_sorted_list() {
-  # Reprint sentinels so the reloaded picker still has them.
   printf '%s\n' "[ skip · plain shell ]"
-  printf '%s\n' "[+ new session ]"
   zellij list-sessions -n 2>/dev/null | while IFS= read -r line; do
     [ -z "$line" ] && continue
     name=${line%% *}
@@ -47,6 +50,7 @@ emit_sorted_list() {
     fi
     printf '%s\t%s %s\n' "$ts" "$icon" "$name"
   done | sort -rn -k1,1 | cut -f2-
+  printf '%s\n' "[+ new session ]"
 }
 
 strip_icon() {

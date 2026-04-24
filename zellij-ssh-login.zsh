@@ -109,14 +109,23 @@ _zellij_login_hook() {
     _zl_preview_cmd="sh $_zl_preview_script {}"
   fi
   if [[ -x $_zl_action_script ]]; then
+    # +pos(2) after reload parks the cursor on the first real session (skip
+    # is at 1, sessions start at 2, new-session is at the bottom). This
+    # makes ctrl-x cascade: each keystroke kills what's at position 2, the
+    # next session slides up, cursor stays on position 2 ready for the
+    # next kill.
     _zl_binds=(
-      "--bind=ctrl-x:execute-silent(sh $_zl_action_script kill {})+reload(sh $_zl_action_script list)"
-      "--bind=ctrl-k:execute-silent(sh $_zl_action_script clean-dead)+reload(sh $_zl_action_script list)"
+      "--bind=ctrl-x:execute-silent(sh $_zl_action_script kill {})+reload(sh $_zl_action_script list)+pos(2)"
+      "--bind=ctrl-k:execute-silent(sh $_zl_action_script clean-dead)+reload(sh $_zl_action_script list)+pos(2)"
     )
     _zl_header="enter=pick · esc=skip · ctrl-x=kill/delete · ctrl-k=clean dead"
   fi
+  # Order: skip first (so Enter-on-open is the safe default), sessions in
+  # the middle (sorted by recency), new-session LAST — so after a kill
+  # + reload the default cursor position never lands on "create new", which
+  # would turn an accidental Enter into an unintended new-session flow.
   choice=$(
-    { print -- "$SKIP_SESSION"; print -- "$NEW_SESSION"; _zl_sorted_sessions; } \
+    { print -- "$SKIP_SESSION"; _zl_sorted_sessions; print -- "$NEW_SESSION"; } \
     | fzf --height=60% --reverse --prompt="zellij session > " --no-multi \
         --preview="$_zl_preview_cmd" --preview-window='right,40%,wrap' \
         --header-first --header="$_zl_header" \
