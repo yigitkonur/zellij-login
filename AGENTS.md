@@ -66,7 +66,7 @@ Conventional Commits with a short, descriptive scope — `feat(hook): …`, `fix
 | `layouts/zellij-login.kdl` | Single-pane + one-line `zellij:compact-bar` layout. Shipped into `$ZELLIJ_CONFIG_DIR/layouts/` by the installer. |
 | `install.sh` | POSIX-sh installer. Handles local-clone and curl-pipe installs, Homebrew bootstrap, dep auto-install, layout + helper placement, and zmx-login → zellij-login migration. |
 | `uninstall.sh` | POSIX-sh uninstaller. Strips the marker block with awk; removes the helpers, layout, and `$XDG_CACHE_HOME/zellij-login/`. |
-| `test/roundtrip.sh` | Sandbox install/idempotency/uninstall/migration/layout/--no-zellij-config test (seven cases). Also asserts helpers and cache dir lifecycle. |
+| `test/roundtrip.sh` | Sandbox install/idempotency/uninstall/migration/layout/--no-zellij-config/curl-pipe-detection test (eight cases). Also asserts helpers and cache dir lifecycle. |
 | `Makefile` | `install` / `uninstall` / `check` / `test` / `hooks`. |
 | `.githooks/pre-push` | Runs `make check` before every `git push`. Enable via `make hooks`. |
 | `README.md` | User-facing docs. Casual tone on purpose (dropped-session-friendly). |
