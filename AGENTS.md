@@ -20,13 +20,14 @@ A ~550-line zsh hook project. On interactive SSH login, the hook sources from `.
 
 - **Hook** (`zellij-ssh-login.zsh`): zsh-only. Must pass `zsh -n`.
 - **Installer / uninstaller / test** (`install.sh`, `uninstall.sh`, `test/roundtrip.sh`): POSIX `sh`. Must pass `sh -n` and `shellcheck --shell=sh`.
-- **Behavior invariants** (verified by `test/roundtrip.sh`; breaking any of these is a regression):
+- **Behavior invariants** (verified by `test/roundtrip.sh` and `test/runtime.sh`; breaking any of these is a regression):
   - Idempotent install — re-running produces exactly one marker block, never duplicates.
   - Byte-for-byte `.zshrc` restore on uninstall.
   - Silent bailout on non-interactive shells, IDE remote shells, already-in-zellij, missing deps.
   - Legacy `zmx-login` install is cleanly migrated (marker block stripped, old dir removed) when the new installer runs.
   - `--no-zellij-config` skips the layout install; the hook still works, falling back to the user's `default_layout`.
   - Uninstaller removes `zellij-login.kdl` from `$ZELLIJ_CONFIG_DIR/layouts/` and leaves other layouts alone.
+  - **Zellij argv contract** (asserted by `test/runtime.sh`): attach-existing runs `zellij attach -c -- <name>`; new-with-layout runs `zellij --layout zellij-login attach -c -- <name>`; new-without-layout (layout file absent) runs `zellij attach -c -- <name>` with no `--layout`. `--layout` is a zellij top-level flag and must come *before* `attach`; the `--` separator is required because user-typed names can start with `-`.
 - **No changes to** `~/.ssh/*`, `/etc/ssh/sshd_config`, SSH `ForceCommand`, or `~/.ssh/rc`. The hook's only integration point is `.zshrc`.
 - **Hot path discipline.** The hook runs on every interactive SSH login. Any work added before the short-circuit guards (interactive / `SSH_TTY` / `ZELLIJ` / IDE exclusions / skip flag) is a hot-path regression. Guards must be parameter expansions only — no subshells, no external commands — until we've confirmed the user wants the hook to fire.
 
