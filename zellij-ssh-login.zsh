@@ -16,6 +16,10 @@ _zellij_login_hook() {
   local SKIP_SESSION="[ skip · plain shell ]"
   local NEW_SESSION="[+ new session ]"
   local CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zellij-login"
+  # One authoritative `zellij list-sessions -n` snapshot per hook run, shared
+  # by _zl_sorted_sessions and zellij-login-preview.sh. Eliminates the
+  # per-keystroke zellij fork the preview pane used to trigger on scroll.
+  local _zl_list_cache="$CACHE_DIR/.sessions.txt"
   local choice name target picked key sub r ts
   local -a roots fzf_out
 
@@ -62,7 +66,8 @@ _zellij_login_hook() {
   # caller before the name goes back to zellij.
   _zl_sorted_sessions() {
     local line name ts icon
-    zellij list-sessions -n 2>/dev/null | while IFS= read -r line; do
+    [[ -r $_zl_list_cache ]] || return 0
+    while IFS= read -r line; do
       [[ -z $line ]] && continue
       name=${line%% *}
       [[ -z $name ]] && continue
@@ -77,7 +82,7 @@ _zellij_login_hook() {
         ts=0
       fi
       printf '%s\t%s %s\n' "$ts" "$icon" "$name"
-    done | sort -rn -k1,1 | cut -f2-
+    done < "$_zl_list_cache" | sort -rn -k1,1 | cut -f2-
   }
 
   # Dir candidates for the new-session picker. Order matters — the first line
@@ -115,6 +120,18 @@ _zellij_login_hook() {
         -o -type d -print 2>/dev/null
     done
   }
+
+  # Take one snapshot of the live session list now, write it via
+  # temp-then-rename so concurrent SSH logins can't corrupt the destination.
+  # Always overwrite (even on zellij failure) so a previous-run cache can
+  # never masquerade as current state. An empty file is the correct
+  # representation of "no sessions" or "zellij unreachable"; preview.sh has
+  # a live fallback for the rare case the file is missing entirely.
+  mkdir -p -- "$CACHE_DIR"
+  local _zl_list_tmp="$CACHE_DIR/.sessions.tmp.$$"
+  zellij list-sessions -n 2>/dev/null > "$_zl_list_tmp"
+  mv -- "$_zl_list_tmp" "$_zl_list_cache" 2>/dev/null \
+    || rm -f -- "$_zl_list_tmp" 2>/dev/null
 
   # Skip is the first (default-highlighted) item so that Enter on an empty
   # query lands you in a normal shell with no zellij involvement.
