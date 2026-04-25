@@ -74,7 +74,7 @@ match_status_line() {
 # handles session names containing spaces.
 list_cache="$cache/.sessions.txt"
 status_line=""
-if [ -f "$list_cache" ]; then
+if [ -r "$list_cache" ]; then
   status_line=$(match_status_line < "$list_cache")
 fi
 if [ -z "$status_line" ]; then
