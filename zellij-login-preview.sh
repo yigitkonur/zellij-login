@@ -34,7 +34,7 @@ cache="${XDG_CACHE_HOME:-$HOME/.cache}/zellij-login"
 # trigger.
 list_cache="$cache/.sessions.txt"
 status_line=""
-if [ -f "$list_cache" ]; then
+if [ -r "$list_cache" ]; then
   status_line=$(awk -v n="$name" '$1 == n { print; exit }' "$list_cache")
 fi
 if [ -z "$status_line" ]; then

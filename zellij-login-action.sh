@@ -78,8 +78,9 @@ drop_cache() {
 # preview render fired by fzf's `reload()` sees the new state. Atomic via
 # temp-then-rename; concurrent writers can't corrupt the destination.
 refresh_list_cache() {
+  mkdir -p -- "$cache"
   rlc_tmp="$cache/.sessions.tmp.$$"
-  zellij list-sessions -n 2>/dev/null > "$rlc_tmp"
+  zellij list-sessions -n 2>/dev/null > "$rlc_tmp" || true
   mv -- "$rlc_tmp" "$cache/.sessions.txt" 2>/dev/null \
     || rm -f -- "$rlc_tmp" 2>/dev/null
 }
