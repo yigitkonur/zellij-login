@@ -13,17 +13,20 @@ _zellij_login_hook() {
   command -v zellij >/dev/null 2>&1 || { print -u2 "zellij-login: zellij not on PATH"; return 0; }
   command -v fzf    >/dev/null 2>&1 || { print -u2 "zellij-login: fzf not on PATH"; return 0; }
 
-  # Opt-in event tracer. Set ZELLIJ_LOGIN_PERF=1 to append a per-event log
-  # to $XDG_STATE_HOME/zellij-login/perf.log -- one section per SSH login
-  # so you can spot which stage (zellij IPC, fzf open, dispatch) is the
-  # slow one. Default is no-op: just one branch + a function dispatch to
-  # `:` per call, so the unset path costs ~microseconds per login.
-  local _zl_perf_t0 _zl_perf_log
-  if [[ -n $ZELLIJ_LOGIN_PERF ]]; then
+  # Opt-in event tracer. Two ways to turn it on:
+  #   1. ZELLIJ_LOGIN_PERF=1 in the env, or
+  #   2. touch $XDG_STATE_HOME/zellij-login/perf.on (sentinel file).
+  # The sentinel exists so you can profile a real `ssh host` login without
+  # AcceptEnv config on the server -- toggle persists until you `rm` it.
+  # Both paths append a per-event log to perf.log in the same dir; default
+  # is no-op (one branch + a function dispatch to `:` per call).
+  local _zl_perf_t0 _zl_perf_log _zl_perf_dir
+  _zl_perf_dir="${XDG_STATE_HOME:-$HOME/.local/state}/zellij-login"
+  if [[ -n $ZELLIJ_LOGIN_PERF || -e $_zl_perf_dir/perf.on ]]; then
     zmodload zsh/datetime 2>/dev/null
     _zl_perf_t0=$EPOCHREALTIME
-    _zl_perf_log="${XDG_STATE_HOME:-$HOME/.local/state}/zellij-login/perf.log"
-    mkdir -p -- "${_zl_perf_log:h}" 2>/dev/null
+    _zl_perf_log="$_zl_perf_dir/perf.log"
+    mkdir -p -- "$_zl_perf_dir" 2>/dev/null
     print -- "=== $(strftime '%FT%T' $EPOCHSECONDS) pid=$$ tty=${SSH_TTY:-?} ===" \
       >> "$_zl_perf_log"
     _zl_perf() {
