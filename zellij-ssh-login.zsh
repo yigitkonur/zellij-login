@@ -80,6 +80,11 @@ _zellij_login_hook() {
   # caller before the name goes back to zellij.
   # Keep the producer finite: fzf waits for EOF before accepting no-match Enter.
   _zl_list_sessions() {
+    # Suppress zsh's interactive job-control chatter ("[5] 69476" on fork,
+    # "[5] + exit 1 ..." on reap) so the picker opens cleanly. local_options
+    # restores monitor/notify when the function returns; the PID-based
+    # kill/wait below is independent of job control and still works.
+    setopt local_options no_monitor no_notify
     local tmp pid ticks max_ticks
     tmp="${TMPDIR:-/tmp}/zellij-login-sessions.$$.$RANDOM"
     : >| "$tmp" || return 0
