@@ -13,6 +13,28 @@ _zellij_login_hook() {
   command -v zellij >/dev/null 2>&1 || { print -u2 "zellij-login: zellij not on PATH"; return 0; }
   command -v fzf    >/dev/null 2>&1 || { print -u2 "zellij-login: fzf not on PATH"; return 0; }
 
+  # Opt-in event tracer. Set ZELLIJ_LOGIN_PERF=1 to append a per-event log
+  # to $XDG_STATE_HOME/zellij-login/perf.log -- one section per SSH login
+  # so you can spot which stage (zellij IPC, fzf open, dispatch) is the
+  # slow one. Default is no-op: just one branch + a function dispatch to
+  # `:` per call, so the unset path costs ~microseconds per login.
+  local _zl_perf_t0 _zl_perf_log
+  if [[ -n $ZELLIJ_LOGIN_PERF ]]; then
+    zmodload zsh/datetime 2>/dev/null
+    _zl_perf_t0=$EPOCHREALTIME
+    _zl_perf_log="${XDG_STATE_HOME:-$HOME/.local/state}/zellij-login/perf.log"
+    mkdir -p -- "${_zl_perf_log:h}" 2>/dev/null
+    print -- "=== $(strftime '%FT%T' $EPOCHSECONDS) pid=$$ tty=${SSH_TTY:-?} ===" \
+      >> "$_zl_perf_log"
+    _zl_perf() {
+      local ms=$(( (EPOCHREALTIME - _zl_perf_t0) * 1000 ))
+      printf '%8.1fms  %-18s  %s\n' "$ms" "$1" "${2:-}" >> "$_zl_perf_log"
+    }
+  else
+    _zl_perf() { : }
+  fi
+  _zl_perf start
+
   local SKIP_SESSION="[ skip · plain shell ]"
   local NEW_SESSION="[+ new session ]"
   local CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zellij-login"
@@ -196,12 +218,15 @@ _zellij_login_hook() {
   # a live fallback for the rare case the file is missing entirely.
   mkdir -p -- "$CACHE_DIR"
   local _zl_list_tmp="$CACHE_DIR/.sessions.tmp.$$"
+  _zl_perf list_start
   _zl_list_sessions > "$_zl_list_tmp" 2>/dev/null
   mv -- "$_zl_list_tmp" "$_zl_list_cache" 2>/dev/null \
     || rm -f -- "$_zl_list_tmp" 2>/dev/null
+  _zl_perf list_done "lines=$(wc -l < "$_zl_list_cache" 2>/dev/null | tr -d ' ')"
 
   # Sweep phantom cache entries now that we have an authoritative live list.
   _zl_gc_cache
+  _zl_perf gc_done
 
   # Skip is the first (default-highlighted) item so that Enter on an empty
   # query lands you in a normal shell with no zellij involvement.
@@ -253,6 +278,7 @@ _zellij_login_hook() {
   # and dispatch straight to the dir picker — saving the user a redundant
   # "new session name:" prompt for a name they already typed.
   local raw fzf_rc
+  _zl_perf picker_open
   if raw=$(
     { print -- "$SKIP_SESSION"; _zl_sorted_sessions; print -- "$NEW_SESSION"; } \
     | fzf --height=60% --reverse --prompt="zellij session > " --no-multi \
@@ -264,6 +290,7 @@ _zellij_login_hook() {
   else
     fzf_rc=$?
   fi
+  _zl_perf picker_close "rc=$fzf_rc"
   # fzf rc: 0 = selection, 1 = no-match + Enter (type-to-create),
   # 130 = Esc / Ctrl-C. --print-query emits the query on stdout regardless,
   # so without this rc check, Esc-after-typing would fall into the
@@ -299,6 +326,7 @@ _zellij_login_hook() {
       "✗ "*) choice=${choice#"✗ "} ;;
     esac
     _zl_record_attach "$choice"
+    _zl_perf dispatch_attach "$choice"
     zellij attach -c -- "$choice"
     return 0
   fi
@@ -318,6 +346,7 @@ _zellij_login_hook() {
   fi
   (( ${#roots} )) || roots=("$HOME")
 
+  _zl_perf dirpicker_open
   fzf_out=("${(@f)$(
     _zl_dir_candidates | awk '!seen[$0]++' \
       | fzf --height=60% --reverse \
@@ -327,6 +356,7 @@ _zellij_login_hook() {
   )}")
   key=${fzf_out[1]}
   picked=${fzf_out[2]}
+  _zl_perf dirpicker_close "key=${key:-} picked=${picked:+y}"
   [[ -z $picked ]] && return 0
 
   if [[ $key == ctrl-n ]]; then
@@ -354,6 +384,7 @@ _zellij_login_hook() {
   [[ -r ${ZELLIJ_CONFIG_DIR:-$HOME/.config/zellij}/layouts/zellij-login.kdl ]] \
     && zj_args+=(--layout zellij-login)
   zj_args+=(attach -c -- "$name")
+  _zl_perf dispatch_create "$name"
   "${zj_args[@]}"
 }
 
@@ -367,5 +398,5 @@ unset -f _zellij_login_hook \
   _zl_mtime _zl_session_name_from_line _zl_valid_new_session_name \
   _zl_record_attach _zl_record_cwd _zl_record_recent_dir \
   _zl_list_sessions _zl_sorted_sessions _zl_dir_candidates \
-  _zl_gc_cache \
+  _zl_gc_cache _zl_perf \
   2>/dev/null || true
